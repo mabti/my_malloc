@@ -14,12 +14,13 @@ int main() {
 
 	char *data = my_malloc(15);
 	char *data2 = my_malloc(15);
-	strncpy(data, "Hello, World!\n", 15);
 	
+	strncpy(data, "Hello, World!\n", 15);
+	strncpy(data2, "Foobar\n", 15);
+
 	printf("%s", data);
 	my_free(data);
 
-	strncpy(data2, "Foobar\n", 8);
 	printf("%s", data2);
 
 	my_free(data2);

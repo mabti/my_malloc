@@ -40,12 +40,18 @@ struct block {
 	/**
 	 * The data for the block.
 	 */
-	uint8_t data[];
+	uint8_t *data;
+};
+
+struct malloc_blocks {
+	size_t len, capacity;
+	struct block *blocks;
 };
 
 struct malloc_mem_t {
 	size_t len;
-	struct block *mem;
+	struct malloc_blocks blocks;
+	uint8_t *mem;
 };
 
 /**

@@ -21,7 +21,7 @@ static struct block *next_block(struct block *block) {
 
 	// offsetof accounts for metadata. 
 	// Should be 9 bytes if I aligned the fields properly
-	return (struct block *)(&block->data[block->len]);
+	return block + 1;
 }
 
 static struct block *prev_block(struct block *block) {
@@ -30,34 +30,35 @@ static struct block *prev_block(struct block *block) {
 	if(block->tags.first)
 		return NULL;
 
-	struct block *last = g_malloc_mem.mem;
-	struct block *current = next_block(last);
-	while(current) {
-		if(current == block)
-			return last;
-
-		last = current;
-		current = next_block(current);
-	}
-	
-	return NULL;
+	return block - 1;
 }
 
 
-static void combine_free_blocks_after(struct block *block) {
-	struct block *current = block;
-	struct block *next = next_block(current);
+// static void combine_free_blocks_after(struct block *block) {
+// 	struct block *current = block;
+// 	struct block *next = next_block(current);
+// 
+// 	while(next) {
+// 		if(next->tags.occupied)
+// 			return;
+// 		// this is done to account for the case when prev block is occupied
+// 		if(current->tags.occupied)
+// 			continue;
+// 
+// 
+// 		current->len += next->len + sizeof(struct block);
+// 		next = next_block(current);
+// 	}
+// }
 
-	while(next) {
-		if(next->tags.occupied)
-			return;
-		// this is done to account for the case when prev block is occupied
-		if(current->tags.occupied)
-			continue;
-
-
-		current->len += next->len + sizeof(struct block);
-		next = next_block(current);
+static void insert_block(size_t index, struct block block) {
+	struct block replaced;
+	replaced = block;
+	
+	for(size_t i = index; i <= g_malloc_mem.blocks.len; i++) {
+		struct block val = g_malloc_mem.blocks.blocks[i];
+		g_malloc_mem.blocks.blocks[i] = replaced;
+		replaced = val;
 	}
 }
 
@@ -66,35 +67,51 @@ static void combine_free_blocks_after(struct block *block) {
  * and the first having the rest of the memory.
  */
 static struct block *split_block(struct block *block, size_t len) {
-	if(block->len == len) 
+	// if(block->len == len) 
+	// 	return block;
+
+	// block->len -= (len + sizeof(struct block));
+
+	// bool was_last = block->tags.last;
+	// block->tags.last = false;
+
+	// struct block *n_block = next_block(block);
+	// *n_block = (struct block){
+	// 	.len = len,
+	// 	.tags = {.last = was_last, .first = false, .occupied = false},
+	// };
+
+	// return n_block;
+
+	if(block->len == len)
 		return block;
 
-	block->len -= (len + sizeof(struct block));
-
-	bool was_last = block->tags.last;
-	block->tags.last = false;
-
-	struct block *n_block = next_block(block);
-	*n_block = (struct block){
+	g_malloc_mem.blocks.len++;
+	block->len -= len;
+	
+	struct block new_block = {
 		.len = len,
-		.tags = {.last = was_last, .first = false, .occupied = false},
+		.tags = {
+			.first = false,
+			.last = block->tags.last,
+			.occupied = false
+		},
+		.data = block->data + block->len
 	};
 
-	return n_block;
+	size_t idx = (block - g_malloc_mem.blocks.blocks) + 1;
+	insert_block(idx, new_block);
+	return &g_malloc_mem.blocks.blocks[idx];
 }
 
 /**
  * Returns the first block out of `g_malloc_mem` that has a size of `len` or greater.
  */
 static struct block *get_first_block_of_size(size_t len) {
-	struct block *block = g_malloc_mem.mem;
-
-	while(block) {
-		if(block->len >= len && !block->tags.occupied) {
+	for(size_t i = 0; i < g_malloc_mem.blocks.len; i++) {
+		struct block *block = &g_malloc_mem.blocks.blocks[i];
+		if(block->len >= len && !block->tags.occupied) 
 			return block;
-		}
-		
-		block = next_block(block);
 	}
 
 	return NULL;
@@ -104,17 +121,14 @@ static struct block *get_first_block_of_size(size_t len) {
  * Gets a pointer to the block from a pointer to the start of the data.
  */
 static struct block *block_from_ptr(void *ptr) {
-	// Bounds for later bounds check
-	const uint8_t *start_ptr = (const uint8_t *) &g_malloc_mem.mem;
-	const uint8_t *end_ptr = start_ptr + g_malloc_mem.len;
+	for(size_t i = 0; i < g_malloc_mem.blocks.len; i++) {
+		struct block *block = &g_malloc_mem.blocks.blocks[i];
 
-	const uint8_t *block = (uint8_t *)ptr - sizeof(struct block);
-
-	if(block < start_ptr || block > end_ptr) {
-		return NULL;
+		if(block->data == ptr)
+			return block;
 	}
 
-	return (struct block *)block;
+	return NULL;
 }
 
 void *my_malloc(size_t len) {
@@ -134,10 +148,10 @@ void my_free(void *ptr) {
 
 	block->tags.occupied = false;
 
-	struct block *prev = prev_block(block);
-	if(prev == NULL)
-		combine_free_blocks_after(block);
-	else
-		combine_free_blocks_after(prev);
+	// struct block *prev = prev_block(block);
+	// if(prev == NULL)
+	// 	combine_free_blocks_after(block);
+	// else
+	// 	combine_free_blocks_after(prev);
 }
 

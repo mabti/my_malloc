@@ -14,10 +14,34 @@
 #define MEM_SIZE 4098
 #endif
 
+#ifndef DEFAULT_BLOCKS
+#define DEFAULT_BLOCKS 16
+#endif
+
+// zero all fields in g_malloc_mem
 struct malloc_mem_t g_malloc_mem = { 0 };
 
+// forward declaration of os functions
 static void *request_os_mem(size_t len);
 static void free_os_mem(void *ptr, size_t len);
+
+/**
+ * Initialises g_malloc_mem.blocks
+ */
+static void init_blocks() {
+	size_t capacity = DEFAULT_BLOCKS * sizeof(struct block);
+	g_malloc_mem.blocks = (struct malloc_blocks) {
+		.len = 1,
+		.capacity = DEFAULT_BLOCKS,
+		.blocks = request_os_mem(capacity)
+	};
+
+	g_malloc_mem.blocks.blocks[0] = (struct block) {
+		.len = MEM_SIZE,
+		.tags = { .first = true, .last = true, .occupied = false },
+		.data = g_malloc_mem.mem
+	};
+}
 
 void init_my_malloc() {
 	if(g_malloc_mem.mem) // if already allocated
@@ -27,20 +51,21 @@ void init_my_malloc() {
 	g_malloc_mem.len = MEM_SIZE;
 	g_malloc_mem.mem = request_os_mem(MEM_SIZE);
 
-	// assign first block
-	g_malloc_mem.mem->len = MEM_SIZE;
-	g_malloc_mem.mem->tags = (struct block_tags){ 
-		.last = true, 
-		.first = true, 
-		.occupied = false 
-	};
+	init_blocks();
 	//TODO: raise error if allocation failed
+}
+
+static void free_blocks() {
+	free_os_mem(g_malloc_mem.blocks.blocks, 
+		g_malloc_mem.blocks.capacity * sizeof(struct block));
 }
 
 void quit_my_malloc() {
 	free_os_mem(g_malloc_mem.mem, g_malloc_mem.len);
 	g_malloc_mem.len = 0;
 	g_malloc_mem.mem = NULL;
+
+	free_blocks();
 }
 
 // Unix impl
