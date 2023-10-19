@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 /**
  * Metadata for a block.
@@ -39,7 +40,7 @@ struct block {
 	/**
 	 * The data for the block.
 	 */
-	char data[];
+	uint8_t data[];
 };
 
 struct malloc_mem_t {
